@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard Cuaca — Multi Kota</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  :root {
+    --bg:#0b1220; --panel:#131c2e; --panel2:#1a2540; --line:#24304d;
+    --txt:#e6edf7; --muted:#7d8bab; --accent:#38bdf8;
+    --hot:#f97316; --cold:#3b82f6; --green:#22c55e; --violet:#8b5cf6; --red:#ef4444;
+  }
+  body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--txt); min-height:100vh; padding:18px 22px 40px }
+  .wrap { max-width:1440px; margin:0 auto; display:flex; flex-direction:column; gap:16px }
+
+  /* ── Hero ── */
+  .hero { position:relative; width:100%; height:20vh; min-height:140px; max-height:230px; border-radius:16px; overflow:hidden; border:1px solid var(--line); flex:0 0 auto }
+  .hero img { width:100%; height:100%; object-fit:cover; display:block; filter:brightness(.5) saturate(1.1) }
+  .hero .hero-ov { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; padding:0 34px; background:linear-gradient(90deg,rgba(8,14,28,.88),rgba(8,14,28,.15)) }
+  .hero h1 { font-size:1.9rem; font-weight:800; text-shadow:0 2px 14px rgba(0,0,0,.6) }
+  .hero p { font-size:.85rem; color:#cfe0f7; margin-top:6px; text-shadow:0 1px 8px rgba(0,0,0,.6) }
+  .hero .hero-credit { position:absolute; right:12px; bottom:8px; font-size:.65rem; color:rgba(255,255,255,.6) }
+
+  /* ── City bar ── */
+  .citybar { display:flex; align-items:center; gap:12px; background:linear-gradient(110deg,#13203a,#0e1830); border:1px solid var(--line); border-radius:16px; padding:14px 20px; flex-wrap:wrap }
+  .citybar label { font-size:.78rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px }
+  .citybar select { background:#1a2540; color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px 14px; font-size:.9rem; font-weight:600; cursor:pointer; min-width:230px; outline:none }
+  .citybar select:focus { border-color:var(--accent) }
+  .citybar option, .citybar optgroup { background:#0f1a2e; color:var(--txt) }
+  .btn { background:#22304f; color:#cfe0f7; border:1px solid var(--line); border-radius:10px; padding:10px 16px; font-size:.85rem; font-weight:600; cursor:pointer; transition:.16s; display:inline-flex; align-items:center; gap:7px }
+  .btn:hover { background:#2e3f66; border-color:var(--accent) }
+  .btn:disabled { opacity:.5; cursor:wait }
+  .btn.primary { background:var(--accent); color:#0b1220; border-color:var(--accent) }
+  .btn.primary:hover { background:#7dd3fc }
+  .citybar .coords { margin-left:auto; font-size:.72rem; color:var(--muted); text-align:right }
+  .loc-msg { font-size:.75rem; color:#fbbf24; width:100% }
+
+  /* ── Top bar ── */
+  .topbar { display:flex; align-items:center; gap:18px; background:linear-gradient(110deg,#13203a,#0e1830); border:1px solid var(--line); border-radius:16px; padding:16px 22px; flex-wrap:wrap }
+  .topbar .loc { font-size:.8rem; color:var(--muted); letter-spacing:.5px; text-transform:uppercase }
+  .topbar .now { font-size:2.4rem; font-weight:800; line-height:1.05 }
+  .topbar .cond { display:flex; gap:10px; align-items:center; margin-top:4px; flex-wrap:wrap }
+  .pill { background:#22304f; border-radius:99px; padding:4px 13px; font-size:.78rem; color:#a9bad8; border:1px solid var(--line) }
+  .pill.blue { background:#0e2a4a; color:#7dd3fc; border-color:#1e4976 }
+  .topbar .right { margin-left:auto; text-align:right; font-size:.8rem; color:var(--muted) }
+  .topbar .right b { color:#cfe0f7; font-weight:600; font-size:.95rem }
+
+  /* ── KPI ── */
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:14px }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:15px 16px; cursor:pointer; transition:.18s; position:relative; overflow:hidden }
+  .kpi:hover { border-color:var(--accent); transform:translateY(-3px); background:var(--panel2) }
+  .kpi .k-label { font-size:.75rem; color:var(--muted); display:flex; align-items:center; gap:6px }
+  .kpi .k-val { font-size:1.7rem; font-weight:800; margin-top:5px }
+  .kpi .k-sub { font-size:.72rem; color:var(--muted); margin-top:3px }
+  .kpi::after { content:"›"; position:absolute; right:12px; top:12px; color:var(--line); font-size:1.2rem; font-weight:700 }
+  .kpi:hover::after { color:var(--accent) }
+  .kpi.hot .k-val { color:var(--hot) } .kpi.cold .k-val { color:var(--cold) }
+  .kpi.green .k-val { color:var(--green) } .kpi.violet .k-val { color:var(--violet) }
+  .bar { height:7px; border-radius:99px; background:#22304f; margin-top:9px; overflow:hidden }
+  .bar i { display:block; height:100%; border-radius:99px; transition:width .7s }
+
+  /* ── Layout ── */
+  .main { display:grid; grid-template-columns:1.62fr 1fr; gap:16px; align-items:start }
+  .col { display:flex; flex-direction:column; gap:16px }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px 18px }
+  .card h2 { font-size:.92rem; font-weight:700; color:#b9c8e2; margin-bottom:2px; display:flex; align-items:center; gap:8px }
+  .card .hint { font-size:.72rem; color:var(--muted); margin-bottom:12px }
+  .card.clickable { cursor:pointer; transition:.18s }
+  .card.clickable:hover { border-color:var(--accent) }
+  .chart-svg { width:100%; display:block; touch-action:manipulation }
+  .chart-svg .pt { cursor:pointer; transition:.12s }
+  .chart-svg .pt:hover { r:6 }
+  .axis { font-size:9px; fill:#5c6b8a }
+
+  /* ── Insights ── */
+  .insights { display:flex; flex-direction:column; gap:10px }
+  .ins { display:flex; gap:11px; background:var(--panel2); border:1px solid var(--line); border-left-width:3px; border-radius:10px; padding:11px 13px; cursor:pointer; transition:.16s }
+  .ins:hover { background:#20304f; transform:translateX(3px) }
+  .ins .ico { font-size:1.15rem; line-height:1.3 }
+  .ins .t { font-size:.8rem; font-weight:700; color:#dbe6f7 }
+  .ins .d { font-size:.75rem; color:var(--muted); margin-top:2px; line-height:1.45 }
+  .ins.warn { border-left-color:var(--hot) } .ins.info { border-left-color:var(--accent) }
+  .ins.good { border-left-color:var(--green) } .ins.danger { border-left-color:var(--red) }
+
+  /* ── Days ── */
+  .days { display:grid; grid-template-columns:repeat(7,1fr); gap:10px }
+  .day { background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 8px; text-align:center; cursor:pointer; transition:.18s }
+  .day:hover { border-color:var(--accent); transform:translateY(-3px) }
+  .day .dh { font-size:.78rem; font-weight:700 }
+  .day .dd { font-size:.68rem; color:var(--muted); margin-bottom:5px }
+  .day .di { font-size:1.6rem; margin:3px 0 }
+  .day .dt { font-size:1.02rem; font-weight:800; color:var(--hot) }
+  .day .dn { font-size:.8rem; color:var(--cold) }
+  .day .dr { font-size:.68rem; color:#7dd3fc; margin-top:5px; background:#0e2a4a; border-radius:99px; padding:2px 0 }
+
+  /* ── Modal ── */
+  .overlay { position:fixed; inset:0; background:rgba(4,9,20,.78); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50 }
+  .modal { background:#101a2e; border:1px solid var(--line); border-radius:18px; max-width:900px; width:100%; max-height:86vh; overflow:auto; padding:24px 26px; animation:pop .18s ease }
+  @keyframes pop { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
+  .modal .m-head { display:flex; align-items:flex-start; gap:14px; margin-bottom:6px }
+  .modal h3 { font-size:1.25rem; font-weight:800 }
+  .modal .m-sub { font-size:.8rem; color:var(--muted); margin-top:3px }
+  .modal .close { margin-left:auto; background:#22304f; border:none; color:#b9c8e2; width:34px; height:34px; border-radius:10px; font-size:1.1rem; cursor:pointer }
+  .modal .close:hover { background:#2e3f66 }
+  .m-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:16px 0 }
+  .m-stat { background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 14px }
+  .m-stat .l { font-size:.72rem; color:var(--muted) }
+  .m-stat .v { font-size:1.35rem; font-weight:800; margin-top:3px }
+  .m-table { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:6px }
+  .m-table th { text-align:left; color:var(--muted); font-weight:600; font-size:.72rem; padding:8px 10px; border-bottom:1px solid var(--line) }
+  .m-table td { padding:7px 10px; border-bottom:1px solid #1a2438 }
+  .m-table tr:hover td { background:#17223a }
+  .spark { margin:14px 0 4px }
+
+  .foot { text-align:center; font-size:.72rem; color:var(--muted); padding-top:6px }
+  .site-footer { margin-top:6px; padding:18px 20px; text-align:center; font-size:.8rem; font-weight:600; letter-spacing:.4px; color:#a9bad8; background:linear-gradient(90deg,#101a2e,#16223c,#101a2e); border:1px solid var(--line); border-radius:14px }
+  .loading { text-align:center; padding:100px 20px; color:var(--muted); font-size:1rem }
+
+  @media(max-width:1080px){ .main{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(2,1fr)} .days{grid-template-columns:repeat(4,1fr)} .m-stats{grid-template-columns:repeat(2,1fr)} }
+  @media(max-width:560px){ .kpis{grid-template-columns:1fr 1fr} .days{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loading">⏳ Memuat…</div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, computed, onMounted } = Vue
+
+/* ═══════════ DAFTAR KOTA ═══════════ */
+const CITIES = [
+  /* Indonesia */
+  { group:'Indonesia', name:'Jakarta',        region:'DKI Jakarta, Indonesia',     lat:-6.2,    lon:106.8   },
+  { group:'Indonesia', name:'Surabaya',       region:'Jawa Timur, Indonesia',      lat:-7.2575, lon:112.7521},
+  { group:'Indonesia', name:'Bandung',        region:'Jawa Barat, Indonesia',      lat:-6.9175, lon:107.6191},
+  { group:'Indonesia', name:'Medan',          region:'Sumatera Utara, Indonesia',  lat:3.5952,  lon:98.6722 },
+  { group:'Indonesia', name:'Semarang',       region:'Jawa Tengah, Indonesia',     lat:-6.9932, lon:110.4203},
+  { group:'Indonesia', name:'Makassar',       region:'Sulawesi Selatan, Indonesia',lat:-5.1477, lon:119.4327},
+  { group:'Indonesia', name:'Palembang',      region:'Sumatera Selatan, Indonesia',lat:-2.9761, lon:104.7754},
+  { group:'Indonesia', name:'Denpasar (Bali)',region:'Bali, Indonesia',            lat:-8.6705, lon:115.2126},
+  { group:'Indonesia', name:'Yogyakarta',     region:'DI Yogyakarta, Indonesia',   lat:-7.7956, lon:110.3695},
+  { group:'Indonesia', name:'Balikpapan',     region:'Kalimantan Timur, Indonesia',lat:-1.2379, lon:116.8529},
+  { group:'Indonesia', name:'Pontianak',      region:'Kalimantan Barat, Indonesia',lat:-0.0263, lon:109.3425},
+  { group:'Indonesia', name:'Manado',         region:'Sulawesi Utara, Indonesia',  lat:1.4748,  lon:124.8421},
+  { group:'Indonesia', name:'Padang',         region:'Sumatera Barat, Indonesia',  lat:-0.9471, lon:100.4172},
+  { group:'Indonesia', name:'Pekanbaru',      region:'Riau, Indonesia',            lat:0.5071,  lon:101.4478},
+  { group:'Indonesia', name:'Banjarmasin',    region:'Kalimantan Selatan, Indonesia',lat:-3.3186,lon:114.5944},
+  { group:'Indonesia', name:'Jayapura',       region:'Papua, Indonesia',           lat:-2.5337, lon:140.7181},
+  /* ASEAN */
+  { group:'ASEAN', name:'Singapore',          region:'Singapura',                  lat:1.3521,  lon:103.8198},
+  { group:'ASEAN', name:'Kuala Lumpur',       region:'Malaysia',                   lat:3.139,   lon:101.6869},
+  { group:'ASEAN', name:'Bangkok',            region:'Thailand',                   lat:13.7563, lon:100.5018},
+  { group:'ASEAN', name:'Manila',             region:'Filipina',                   lat:14.5995, lon:120.9842},
+  { group:'ASEAN', name:'Hanoi',              region:'Vietnam',                    lat:21.0278, lon:105.8342},
+  { group:'ASEAN', name:'Ho Chi Minh City',   region:'Vietnam',                    lat:10.8231, lon:106.6297},
+  { group:'ASEAN', name:'Phnom Penh',         region:'Kamboja',                    lat:11.5564, lon:104.9282},
+  { group:'ASEAN', name:'Vientiane',          region:'Laos',                       lat:17.9757, lon:102.6331},
+  { group:'ASEAN', name:'Yangon',             region:'Myanmar',                    lat:16.8661, lon:96.1951 },
+  { group:'ASEAN', name:'Bandar Seri Begawan',region:'Brunei Darussalam',          lat:4.9031,  lon:114.9398},
+  /* Dunia */
+  { group:'Dunia', name:'Tokyo',              region:'Jepang',                     lat:35.6762, lon:139.6503},
+  { group:'Dunia', name:'Seoul',              region:'Korea Selatan',              lat:37.5665, lon:126.978 },
+  { group:'Dunia', name:'Beijing',            region:'Tiongkok',                   lat:39.9042, lon:116.4074},
+  { group:'Dunia', name:'New York',           region:'Amerika Serikat',            lat:40.7128, lon:-74.006 },
+  { group:'Dunia', name:'Los Angeles',        region:'Amerika Serikat',            lat:34.0522, lon:-118.2437},
+  { group:'Dunia', name:'London',             region:'Inggris',                    lat:51.5074, lon:-0.1278 },
+  { group:'Dunia', name:'Paris',              region:'Prancis',                    lat:48.8566, lon:2.3522  },
+  { group:'Dunia', name:'Dubai',              region:'Uni Emirat Arab',            lat:25.2048, lon:55.2708 },
+  { group:'Dunia', name:'Sydney',             region:'Australia',                  lat:-33.8688,lon:151.2093},
+  { group:'Dunia', name:'Toronto',            region:'Kanada',                     lat:43.6532, lon:-79.3832},
+]
+
+const DEFAULT_CITY = CITIES[0]  /* Jakarta */
+
+/* ═══════════ HELPERS ═══════════ */
+const ICONS = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',80:'🌦️',81:'🌧️',82:'⛈️',95:'⛈️',96:'⛈️',99:'⛈️'}
+const LABELS = {0:'Cerah',1:'Sebagian Cerah',2:'Berawan Sebagian',3:'Mendung',45:'Berkabut',48:'Berkabut Tebal',51:'Gerimis Ringan',53:'Gerimis',55:'Gerimis Lebat',61:'Hujan Ringan',63:'Hujan',65:'Hujan Lebat',80:'Hujan Lokal',81:'Hujan Sedang',82:'Hujan Sangat Lebat',95:'Hujan Petir',96:'Hujan Petir Lebat',99:'Hujan Petir + Es'}
+const DAYS = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu']
+const pad = n => String(n).padStart(2,'0')
+
+function linePath(vals, W, H, padY){
+  const min=Math.min(...vals), max=Math.max(...vals), rng=max-min||1
+  const x = i => 30 + i*(W-60)/(vals.length-1)
+  const y = v => padY + (1-(v-min)/rng)*(H-padY*2)
+  const pts = vals.map((v,i)=>[x(i),y(v)])
+  return { min,max,x,y,pts,
+    line: pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' '),
+    area: 'M'+x(0)+','+(H-padY)+' '+pts.map(p=>'L'+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+' L'+x(vals.length-1)+','+(H-padY)+' Z' }
+}
+
+async function fetchWeather(lat, lon){
+  const API = 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon
+    + '&hourly=temperature_2m,relative_humidity_2m,windspeed_10m,precipitation_probability'
+    + '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode,sunrise,sunset,uv_index_max'
+    + '&timezone=auto&forecast_days=7'
+  const d = await fetch(API).then(r=>r.json())
+  const tz = d.timezone_abbreviation || 'WIB'
+  // Waktu lokal KOTA (bukan waktu browser) — pakai utc_offset_seconds dari API
+  const cityNow = new Date(Date.now() + (d.utc_offset_seconds || 0) * 1000)
+  const prefix = `${cityNow.getUTCFullYear()}-${pad(cityNow.getUTCMonth()+1)}-${pad(cityNow.getUTCDate())}T${pad(cityNow.getUTCHours())}:00`
+  let idx = d.hourly.time.indexOf(prefix)
+  if (idx < 0) {
+    // fallback: cari jam terdekat yang tersedia
+    const day = prefix.slice(0,10)
+    idx = d.hourly.time.findIndex(t => t >= prefix)
+    if (idx < 0) idx = d.hourly.time.findIndex(t => t.slice(0,10) === day)
+    if (idx < 0) idx = 0
+  }
+
+  const hourly = d.hourly.time.slice(idx, idx+24).map((t,i)=>({
+    iso:t, time:t.slice(11,16)+' '+tz, hhmm:t.slice(11,16),
+    suhu:d.hourly.temperature_2m[idx+i],
+    lembab:d.hourly.relative_humidity_2m[idx+i],
+    angin:d.hourly.windspeed_10m[idx+i],
+    hujan:d.hourly.precipitation_probability[idx+i]
+  }))
+
+  const daily = d.daily.time.map((t,i)=>{
+    const dt = new Date(t+'T00:00'); const code = d.daily.weathercode[i]
+    return { iso:t, hari:i===0?'Hari ini':DAYS[dt.getDay()], tgl:dt.getDate()+' '+dt.toLocaleString('id',{month:'short'}),
+      icon:ICONS[code]||'🌡️', label:LABELS[code]||'-',
+      max:d.daily.temperature_2m_max[i], min:d.daily.temperature_2m_min[i],
+      hujan:d.daily.precipitation_probability_max[i], uv:d.daily.uv_index_max[i],
+      sunrise:(d.daily.sunrise[i]||'').slice(11,16), sunset:(d.daily.sunset[i]||'').slice(11,16) }
+  })
+
+  const temps = hourly.map(h=>h.suhu)
+  return {
+    tz,
+    now:{ suhu:hourly[0].suhu, lembab:hourly[0].lembab, angin:hourly[0].angin, hujan:hourly[0].hujan },
+    updated: `${pad(cityNow.getUTCDate())} ${['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][cityNow.getUTCMonth()]} ${cityNow.getUTCFullYear()}, ${pad(cityNow.getUTCHours())}:${pad(cityNow.getUTCMinutes())}`,
+    hourly, daily,
+    stats:{ tMax:Math.max(...temps), tMin:Math.min(...temps),
+      tMaxAt:hourly[temps.indexOf(Math.max(...temps))].hhmm,
+      tMinAt:hourly[temps.indexOf(Math.min(...temps))].hhmm,
+      avg:+(temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1),
+      hujanPuncak:Math.max(...hourly.map(h=>h.hujan)),
+      hujanPuncakAt:hourly[hourly.map(h=>h.hujan).indexOf(Math.max(...hourly.map(h=>h.hujan)))].hhmm,
+      anginMaks:Math.max(...hourly.map(h=>h.angin)),
+      lembabAvg:Math.round(hourly.reduce((a,b)=>a+b.lembab,0)/hourly.length) }
+  }
+}
+
+/* Reverse geocode → nama kota dari koordinat GPS */
+async function reverseGeocode(lat, lon){
+  const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=id`).then(x=>x.json())
+  const city = r.city || r.locality || r.principalSubdivision || 'Lokasi Anda'
+  const country = r.countryName || ''
+  const region = [r.locality, r.principalSubdivision, r.countryName].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(', ')
+  return { name: city, country, region: region || country }
+}
+
+/* ═══════════ APP ═══════════ */
+createApp({
+  setup(){
+    const W = ref(null), loading = ref(true), error = ref('')
+    const modal = ref(null)
+    const city = ref(DEFAULT_CITY)
+    const cityGroups = computed(()=>{
+      const g = {}
+      CITIES.forEach(c => { (g[c.group] ||= []).push(c) })
+      return g
+    })
+    const locating = ref(false)
+    const locMsg = ref('')
+
+    async function load(c){
+      loading.value = true; error.value = ''; modal.value = null
+      try {
+        const [w] = await Promise.all([ fetchWeather(c.lat, c.lon) ])
+        W.value = w
+      } catch(e){ error.value = 'Gagal mengambil data cuaca. Periksa koneksi internet.' }
+      finally { loading.value = false }
+    }
+
+    function onSelect(e){
+      const key = e.target.value
+      const c = CITIES.find(x => x.name === key)
+      if (!c) return
+      city.value = c
+      locMsg.value = ''
+      try { localStorage.setItem('wx_city', key) } catch(_){}
+      load(c)
+    }
+
+    async function useMyLocation(){
+      locMsg.value = ''
+      if (!navigator.geolocation){ locMsg.value = '⚠️ Browser tidak mendukung geolocation.'; return }
+      locating.value = true
+      navigator.geolocation.getCurrentPosition(async pos => {
+        try {
+          const { latitude:lat, longitude:lon } = pos.coords
+          const info = await reverseGeocode(lat, lon)
+          const c = { group:'Lokasi Anda', name:info.name, region:info.region || info.country || 'Lokasi Anda', lat, lon, dynamic:true }
+          city.value = c
+          try { localStorage.setItem('wx_city', info.name) } catch(_){}
+          await load(c)
+          locMsg.value = `📍 Terdeteksi: ${info.name}${info.country?', '+info.country:''} (${lat.toFixed(3)}, ${lon.toFixed(3)})`
+        } catch(err){
+          locMsg.value = '⚠️ Gagal mengenali nama kota dari lokasi Anda.'
+        } finally { locating.value = false }
+      }, err => {
+        locating.value = false
+        locMsg.value = err.code === 1
+          ? '⚠️ Izin lokasi ditolak. Aktifkan izin lokasi di browser untuk memakai fitur ini.'
+          : '⚠️ Gagal mendapatkan lokasi. Coba lagi.'
+      }, { enableHighAccuracy:false, timeout:10000, maximumAge:300000 })
+    }
+
+    onMounted(()=>{
+      let saved = null
+      try { saved = localStorage.getItem('wx_city') } catch(_){}
+      const c = CITIES.find(x=>x.name===saved) || DEFAULT_CITY
+      city.value = c
+      load(c)
+    })
+
+    /* ── Charts ── */
+    const UNIT = { suhu:'°C', lembab:'%', angin:' km/h', hujan:'%' }
+    const mk = (key, color) => computed(()=>{
+      if(!W.value) return null
+      const vals = W.value.hourly.map(h=>h[key])
+      return { ...linePath(vals, 820, 170, 26), color, vals }
+    })
+    const cTemp = mk('suhu','#f97316'), cLemb = mk('lembab','#3b82f6')
+    const cAngin= mk('angin','#8b5cf6'), cHujan= mk('hujan','#38bdf8')
+
+    /* ── Insights (dinamis sesuai kota) ── */
+    const insights = computed(()=>{
+      if(!W.value) return []
+      const s = W.value.stats, cn = city.value.name, out = []
+      out.push({ type:'info', ico:'🌡️', t:`Puncak suhu di ${cn} hari ini`, d:`Mencapai ${s.tMax}°C sekitar ${s.tMaxAt}. Suhu terendah ${s.tMin}°C pada ${s.tMinAt}.` })
+      if(s.hujanPuncak>=70) out.push({ type:'danger', ico:'☔', t:`Waspada hujan lebat di ${cn}`, d:`Peluang hujan memuncak ${s.hujanPuncak}% pada ${s.hujanPuncakAt}. Bawa payung/jas hujan.` })
+      else if(s.hujanPuncak>=40) out.push({ type:'warn', ico:'🌦️', t:`Potensi hujan sedang di ${cn}`, d:`Peluang hujan hingga ${s.hujanPuncak}% pada ${s.hujanPuncakAt}.` })
+      else out.push({ type:'good', ico:'☀️', t:`Cuaca ${cn} relatif kering`, d:`Peluang hujan maksimal hanya ${s.hujanPuncak}%. Cocok untuk aktivitas luar.` })
+      if(s.anginMaks>=20) out.push({ type:'warn', ico:'💨', t:'Angin cukup kencang', d:`Kecepatan angin mencapai ${s.anginMaks} km/h. Hati-hati bagi pengendara motor.` })
+      out.push({ type:'info', ico:'💧', t:'Kelembaban rata-rata', d:`Rata-rata ${s.lembabAvg}% dalam 24 jam. ${s.lembabAvg>=80?'Terasa lembap & gerah.':'Terasa nyaman.'}` })
+      const uv = W.value.daily[0].uv
+      out.push({ type:uv>=8?'danger':uv>=6?'warn':'good', ico:'🕶️', t:`Indeks UV di ${cn}`, d:`UV maksimal ${uv}. ${uv>=8?'Sangat tinggi — pakai tabir surya & topi.':uv>=6?'Tinggi — lindungi kulit.':'Aman untuk aktivitas luar.'}` })
+      const maxRain = Math.max(...W.value.daily.slice(0,3).map(d=>d.hujan))
+      out.push({ type:maxRain>=80?'danger':'info', ico:'📅', t:'Tren 3 hari ke depan', d:`Peluang hujan tertinggi ${maxRain}%. ${maxRain>=80?'Siapkan antisipasi banjir/genangan.':'Kondisi relatif terkendali.'}` })
+      return out
+    })
+
+    /* ── Modal ── */
+    const detailHourly = (key, title, ico, color) => {
+      const h = W.value.hourly, vals = h.map(x=>x[key])
+      return { title, ico, sub:`${city.value.name} · Rincian per jam (24 jam, ${W.value.tz})`, color, unit:UNIT[key],
+        stats:[ {l:'Tertinggi',v:Math.max(...vals)+UNIT[key]}, {l:'Terendah',v:Math.min(...vals)+UNIT[key]},
+          {l:'Rata-rata',v:+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1)+UNIT[key]}, {l:'Sekarang',v:vals[0]+UNIT[key]} ],
+        chart:{ vals, color, unit:UNIT[key] },
+        rows:h.map(x=>({ time:x.time, v:x[key], extra:`${x.suhu}°C · ${x.lembab}% · ${x.angin} km/h` })) }
+    }
+    const detailDay = d => ({ title:`${d.hari} — ${d.tgl}`, ico:d.icon,
+      sub:`${city.value.name} · ${d.label} · Sunrise ${d.sunrise} · Sunset ${d.sunset} ${W.value.tz}`,
+      color:'#38bdf8', unit:'', stats:[ {l:'Suhu Maks',v:d.max+'°C'},{l:'Suhu Min',v:d.min+'°C'},{l:'Peluang Hujan',v:d.hujan+'%'},{l:'Indeks UV',v:d.uv} ],
+      chart:null, dayBars:{ max:d.max, min:d.min, hujan:d.hujan }, rows:[] })
+
+    const openKpi = key => {
+      const map = { suhu:()=>detailHourly('suhu','Suhu Udara','🌡️','#f97316'), lembab:()=>detailHourly('lembab','Kelembaban','💧','#3b82f6'),
+        angin:()=>detailHourly('angin','Kecepatan Angin','💨','#8b5cf6'), hujan:()=>detailHourly('hujan','Peluang Hujan','☔','#38bdf8') }
+      if (map[key]) modal.value = map[key]()
+    }
+    const openChart = (title,ico,key,color) => { modal.value = detailHourly(key,title,ico,color) }
+    const openDay = d => { modal.value = detailDay(d) }
+    const openInsight = ins => {
+      const base = { title:ins.t, ico:ins.ico, sub:ins.d, color:'#38bdf8', unit:'', stats:[], rows:[], chart:null }
+      if(ins.ico==='📅') base.rows = W.value.daily.map(d=>({ time:`${d.hari}, ${d.tgl}`, v:d.hujan+'%', extra:`${d.icon} ${d.label} · ${d.min}–${d.max}°C` }))
+      else if(ins.ico==='🌡️') base.rows = W.value.hourly.filter((_,i)=>i%2===0).map(h=>({ time:h.time, v:h.suhu+'°C', extra:`Lembab ${h.lembab}% · Hujan ${h.hujan}%` }))
+      else if(ins.ico==='💧') base.rows = W.value.hourly.filter((_,i)=>i%3===0).map(h=>({ time:h.time, v:h.lembab+'%', extra:`Suhu ${h.suhu}°C` }))
+      else if(ins.ico==='🕶️') base.rows = W.value.daily.map(d=>({ time:`${d.hari}, ${d.tgl}`, v:'UV '+d.uv, extra:`Sunrise ${d.sunrise} · Sunset ${d.sunset}` }))
+      else if(['☔','🌦️','☀️'].includes(ins.ico)) base.rows = W.value.hourly.map(h=>({ time:h.time, v:h.hujan+'%', extra:`Suhu ${h.suhu}°C` }))
+      else if(ins.ico==='💨') base.rows = W.value.hourly.map(h=>({ time:h.time, v:h.angin+' km/h', extra:`Suhu ${h.suhu}°C` }))
+      modal.value = base
+    }
+    const close = ()=>{ modal.value = null }
+
+    const modalChart = computed(()=>{
+      if(!modal.value || !modal.value.chart) return null
+      const c = modal.value.chart
+      return { ...linePath(c.vals, 820, 150, 24), color:c.color, unit:c.unit }
+    })
+    const modalBars = computed(()=>{
+      if(!modal.value || !modal.value.dayBars) return null
+      const d = modal.value.dayBars
+      return [ {l:'Maks',v:d.max,c:'#f97316',pct:100}, {l:'Min',v:d.min,c:'#3b82f6',pct:Math.round(d.min/d.max*100)}, {l:'Hujan',v:d.hujan,c:'#38bdf8',pct:d.hujan} ]
+    })
+
+    return { W, loading, error, modal, insights, city, cityGroups, locating, locMsg,
+      cTemp, cLemb, cAngin, cHujan,
+      onSelect, useMyLocation, openKpi, openChart, openDay, openInsight, close, modalChart, modalBars }
+  },
+
+  template:`
+  <div class="loading" v-if="loading">⏳ Memuat data cuaca {{ city.name }}…</div>
+  <div class="loading" v-else-if="error">⚠️ {{ error }}
+    <div style="margin-top:16px"><button class="btn primary" @click="useMyLocation">📍 Pakai Lokasi Saya</button></div>
+  </div>
+
+  <div class="wrap" v-else>
+
+    <!-- HERO -->
+    <div class="hero">
+      <img src="https://images.unsplash.com/photo-1555899434-94d1368aa7af?auto=format&fit=crop&w=1600&q=80" alt="City skyline" />
+      <div class="hero-ov">
+        <h1>🌤️ Dashboard Cuaca {{ city.name }}</h1>
+        <p>{{ city.region }} · Prakiraan real-time · Suhu per jam · Insight otomatis · {{ W.tz }}</p>
+      </div>
+      <div class="hero-credit">Foto: Unsplash</div>
+    </div>
+
+    <!-- CITY BAR -->
+    <div class="citybar">
+      <label>🌍 Kota</label>
+      <select :value="city.name" @change="onSelect">
+        <optgroup v-for="(list,g) in cityGroups" :key="g" :label="g">
+          <option v-for="c in list" :key="g+'-'+c.name" :value="c.name">{{ c.name }} — {{ c.region }}</option>
+        </optgroup>
+      </select>
+      <button class="btn" :disabled="locating" @click="useMyLocation">
+        {{ locating ? '⏳ Mendeteksi…' : '📍 Pakai Lokasi Saya' }}
+      </button>
+      <div class="coords">Lat {{ city.lat.toFixed(3) }}° · Lon {{ city.lon.toFixed(3) }}°</div>
+      <div class="loc-msg" v-if="locMsg">{{ locMsg }}</div>
+    </div>
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+      <div>
+        <div class="loc">📍 {{ city.name }} · {{ city.region }} · {{ W.updated }} {{ W.tz }}</div>
+        <div class="now">{{ W.daily[0].icon }} {{ W.now.suhu }}°C</div>
+        <div class="cond">
+          <span class="pill blue">{{ W.daily[0].label }}</span>
+          <span class="pill">Maks {{ W.stats.tMax }}°C · Min {{ W.stats.tMin }}°C</span>
+          <span class="pill">Rata-rata {{ W.stats.avg }}°C</span>
+        </div>
+      </div>
+      <div class="right">
+        🌅 Sunrise <b>{{ W.daily[0].sunrise }} {{ W.tz }}</b><br/>
+        🌇 Sunset <b>{{ W.daily[0].sunset }} {{ W.tz }}</b><br/>
+        🕶️ UV <b>{{ W.daily[0].uv }}</b>
+      </div>
+    </div>
+
+    <!-- KPI -->
+    <div class="kpis">
+      <div class="kpi hot" @click="openKpi('suhu')">
+        <div class="k-label">🌡️ Suhu di {{ city.name }}</div>
+        <div class="k-val">{{ W.now.suhu }}°C</div>
+        <div class="k-sub">Maks {{ W.stats.tMax }}° · Min {{ W.stats.tMin }}°</div>
+        <div class="bar"><i :style="{width:((W.now.suhu-15)/25*100)+'%',background:'#f97316'}"></i></div>
+      </div>
+      <div class="kpi cold" @click="openKpi('lembab')">
+        <div class="k-label">💧 Kelembaban</div>
+        <div class="k-val">{{ W.now.lembab }}%</div>
+        <div class="k-sub">Rata-rata {{ W.stats.lembabAvg }}%</div>
+        <div class="bar"><i :style="{width:W.now.lembab+'%',background:'#3b82f6'}"></i></div>
+      </div>
+      <div class="kpi violet" @click="openKpi('angin')">
+        <div class="k-label">💨 Kecepatan Angin</div>
+        <div class="k-val">{{ W.now.angin }}<small style="font-size:.9rem"> km/h</small></div>
+        <div class="k-sub">Maks {{ W.stats.anginMaks }} km/h</div>
+        <div class="bar"><i :style="{width:Math.min(W.now.angin*5,100)+'%',background:'#8b5cf6'}"></i></div>
+      </div>
+      <div class="kpi green" @click="openKpi('hujan')">
+        <div class="k-label">☔ Peluang Hujan</div>
+        <div class="k-val">{{ W.now.hujan }}%</div>
+        <div class="k-sub">Puncak {{ W.stats.hujanPuncak }}% @ {{ W.stats.hujanPuncakAt }}</div>
+        <div class="bar"><i :style="{width:W.now.hujan+'%',background:'#22c55e'}"></i></div>
+      </div>
+      <div class="kpi" @click="openDay(W.daily[0])">
+        <div class="k-label">📅 Prakiraan Hari Ini</div>
+        <div class="k-val">{{ W.daily[0].icon }} {{ W.daily[0].label }}</div>
+        <div class="k-sub">UV {{ W.daily[0].uv }} · Hujan {{ W.daily[0].hujan }}%</div>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+      <div class="col">
+        <div class="card clickable" @click="openChart('Suhu Udara','🌡️','suhu','#f97316')">
+          <h2>🌡️ Suhu Udara {{ city.name }} — 24 Jam</h2>
+          <div class="hint">Klik grafik untuk rincian per jam ({{ W.tz }})</div>
+          <svg class="chart-svg" viewBox="0 0 820 170" v-if="cTemp">
+            <defs><linearGradient id="gT" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f97316" stop-opacity=".45"/><stop offset="100%" stop-color="#f97316" stop-opacity="0"/></linearGradient></defs>
+            <path :d="cTemp.area" fill="url(#gT)"/>
+            <path :d="cTemp.line" fill="none" stroke="#f97316" stroke-width="2.6" stroke-linejoin="round"/>
+            <g v-for="(h,i) in W.hourly" :key="i">
+              <circle class="pt" :cx="cTemp.x(i)" :cy="cTemp.y(h.suhu)" r="3.4" fill="#f97316" stroke="#0b1220" stroke-width="1.4"/>
+              <text v-if="i%3===0" class="axis" :x="cTemp.x(i)" y="166" text-anchor="middle">{{h.hhmm}}</text>
+              <text v-if="i%4===0" :x="cTemp.x(i)" :y="cTemp.y(h.suhu)-9" text-anchor="middle" font-size="9" fill="#fdba74">{{h.suhu}}°</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="card clickable" @click="openChart('Kelembaban','💧','lembab','#3b82f6')">
+          <h2>💧 Kelembaban Relatif — 24 Jam</h2>
+          <div class="hint">Klik grafik untuk rincian per jam</div>
+          <svg class="chart-svg" viewBox="0 0 820 170" v-if="cLemb">
+            <defs><linearGradient id="gL" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6" stop-opacity=".4"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs>
+            <path :d="cLemb.area" fill="url(#gL)"/>
+            <path :d="cLemb.line" fill="none" stroke="#3b82f6" stroke-width="2.4" stroke-linejoin="round"/>
+            <g v-for="(h,i) in W.hourly" :key="i">
+              <circle class="pt" :cx="cLemb.x(i)" :cy="cLemb.y(h.lembab)" r="3.4" fill="#3b82f6" stroke="#0b1220" stroke-width="1.4"/>
+              <text v-if="i%3===0" class="axis" :x="cLemb.x(i)" y="166" text-anchor="middle">{{h.hhmm}}</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="card clickable" @click="openChart('Kecepatan Angin','💨','angin','#8b5cf6')">
+          <h2>💨 Kecepatan Angin — 24 Jam</h2>
+          <div class="hint">Klik grafik untuk rincian per jam</div>
+          <svg class="chart-svg" viewBox="0 0 820 150" v-if="cAngin">
+            <defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8b5cf6" stop-opacity=".4"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/></linearGradient></defs>
+            <path :d="cAngin.area" fill="url(#gA)"/>
+            <path :d="cAngin.line" fill="none" stroke="#8b5cf6" stroke-width="2.4" stroke-linejoin="round"/>
+            <g v-for="(h,i) in W.hourly" :key="i">
+              <circle class="pt" :cx="cAngin.x(i)" :cy="cAngin.y(h.angin)" r="3.2" fill="#8b5cf6" stroke="#0b1220" stroke-width="1.4"/>
+              <text v-if="i%3===0" class="axis" :x="cAngin.x(i)" y="146" text-anchor="middle">{{h.hhmm}}</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="card clickable" @click="openChart('Peluang Hujan','☔','hujan','#38bdf8')">
+          <h2>☔ Peluang Hujan per Jam (%)</h2>
+          <div class="hint">Klik grafik untuk rincian per jam</div>
+          <svg class="chart-svg" viewBox="0 0 820 150">
+            <g v-for="(h,i) in W.hourly" :key="i">
+              <rect :x="30+i*(760/W.hourly.length)" :y="120-h.hujan*0.9" :width="760/W.hourly.length-4" :height="h.hujan*0.9"
+                    :fill="h.hujan>=80?'#ef4444':h.hujan>=50?'#8b5cf6':'#38bdf8'" rx="3"/>
+              <text v-if="i%3===0" class="axis" :x="30+i*(760/W.hourly.length)+(760/W.hourly.length/2)" y="146" text-anchor="middle">{{h.hhmm}}</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <h2>💡 Insight Otomatis — {{ city.name }}</h2>
+          <div class="hint">Klik salah satu untuk melihat detail</div>
+          <div class="insights">
+            <div v-for="(ins,i) in insights" :key="i" class="ins" :class="ins.type" @click="openInsight(ins)">
+              <div class="ico">{{ ins.ico }}</div>
+              <div><div class="t">{{ ins.t }}</div><div class="d">{{ ins.d }}</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>📅 Prakiraan 7 Hari — {{ city.name }}</h2>
+          <div class="hint">Klik kartu hari untuk detail lengkap</div>
+          <div class="days" style="grid-template-columns:repeat(4,1fr)">
+            <div v-for="d in W.daily" :key="d.iso" class="day" @click="openDay(d)">
+              <div class="dh">{{ d.hari }}</div>
+              <div class="dd">{{ d.tgl }}</div>
+              <div class="di">{{ d.icon }}</div>
+              <div class="dt">{{ d.max }}°</div>
+              <div class="dn">{{ d.min }}°</div>
+              <div class="dr">☔ {{ d.hujan }}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">📡 Data dari Open-Meteo API · Zona waktu {{ W.tz }} · Reverse geocoding BigDataCloud · Gratis tanpa API key</div>
+    <div class="site-footer">Creao AI Agent - NexusAI Community - 2026-X-IV</div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="overlay" v-if="modal" @click.self="close">
+    <div class="modal">
+      <div class="m-head">
+        <div style="font-size:2rem">{{ modal.ico }}</div>
+        <div><h3>{{ modal.title }}</h3><div class="m-sub">{{ modal.sub }}</div></div>
+        <button class="close" @click="close">✕</button>
+      </div>
+      <div class="m-stats" v-if="modal.stats.length">
+        <div class="m-stat" v-for="(s,i) in modal.stats" :key="i"><div class="l">{{ s.l }}</div><div class="v" :style="{color:modal.color}">{{ s.v }}</div></div>
+      </div>
+      <div class="spark" v-if="modalChart">
+        <svg class="chart-svg" viewBox="0 0 820 150">
+          <defs><linearGradient id="gM" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" :stop-color="modalChart.color" stop-opacity=".4"/><stop offset="100%" :stop-color="modalChart.color" stop-opacity="0"/></linearGradient></defs>
+          <path :d="modalChart.area" fill="url(#gM)"/>
+          <path :d="modalChart.line" fill="none" :stroke="modalChart.color" stroke-width="2.4" stroke-linejoin="round"/>
+          <g v-for="(v,i) in modal.chart.vals" :key="i"><circle :cx="modalChart.x(i)" :cy="modalChart.y(v)" r="3" :fill="modalChart.color" stroke="#101a2e" stroke-width="1.2"/></g>
+        </svg>
+      </div>
+      <div class="spark" v-if="modalBars">
+        <div v-for="(b,i) in modalBars" :key="i" style="display:flex;align-items:center;gap:12px;margin:10px 0">
+          <span style="width:60px;font-size:.8rem;color:var(--muted)">{{ b.l }}</span>
+          <div class="bar" style="flex:1"><i :style="{width:b.pct+'%',background:b.c}"></i></div>
+          <span style="width:70px;text-align:right;font-weight:700;font-size:.85rem">{{ b.v }}</span>
+        </div>
+      </div>
+      <table class="m-table" v-if="modal.rows.length">
+        <thead><tr><th>Waktu ({{ W.tz }})</th><th>Nilai</th><th>Detail</th></tr></thead>
+        <tbody><tr v-for="(r,i) in modal.rows" :key="i"><td>{{ r.time }}</td><td style="font-weight:700" :style="{color:modal.color}">{{ r.v }}</td><td style="color:var(--muted)">{{ r.extra }}</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  `
+}).mount('#app')
+</script>
+</body>
+</html>
